@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWCPC Volunteer Hours App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .logo {
+      width: 72px;
+      height: 72px;
+      background: #2d6a4f;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 36px;
+    }
+    h1 {
+      color: #1a1a1a;
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+    .org {
+      color: #2d6a4f;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    p {
+      color: #555;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .btn {
+      display: block;
+      background: #2d6a4f;
+      color: white;
+      text-decoration: none;
+      padding: 16px 24px;
+      border-radius: 10px;
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #245a42; }
+    .note {
+      font-size: 13px;
+      color: #999;
+      margin-top: 20px;
+      margin-bottom: 0;
+    }
+    .stores {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #eee;
+    }
+    .store-btn {
+      flex: 1;
+      display: block;
+      padding: 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .ios-btn { background: #000; color: #fff; }
+    .android-btn { background: #1a73e8; color: #fff; }
+    .store-label { font-size: 10px; font-weight: 400; display: block; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🌿</div>
+    <div class="org">Southwest Corridor Park Conservancy</div>
+    <h1>Volunteer Hours App</h1>
+    <p>Log your volunteer hours quickly and easily. Tap the button below to open the app.</p>
+
+    <a class="btn" href="exp://u.expo.dev/080139ed-e339-4675-a999-79f5fafada86?channel-name=main">
+      Open Volunteer Hours App →
+    </a>
+
+    <p class="note">Requires <strong>Expo Go</strong> — free on iPhone and Android.</p>
+
+    <div class="stores">
+      <a class="store-btn ios-btn" href="https://apps.apple.com/app/expo-go/id982107779">
+        <span class="store-label">Download on the</span>
+        App Store
+      </a>
+      <a class="store-btn android-btn" href="https://play.google.com/store/apps/details?id=host.exp.exponent">
+        <span class="store-label">Get it on</span>
+        Google Play
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // On mobile, attempt to auto-open Expo Go
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = "exp://u.expo.dev/080139ed-e339-4675-a999-79f5fafada86?channel-name=main";
+    }
+  </script>
+</body>
+</html>
