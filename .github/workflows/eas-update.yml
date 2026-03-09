@@ -28,4 +28,9 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Ensure main channel exists
+        run: eas channel:create main --non-interactive 2>/dev/null || true
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - run: eas update --branch main --message "${{ github.event.head_commit.message }}" --non-interactive
