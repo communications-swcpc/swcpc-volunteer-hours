@@ -153,21 +153,11 @@
 
     function addToHomeScreen() {
       const tip = document.getElementById('shareTip');
-      if (navigator.share) {
-        // Modern Web Share API — works on iOS Safari and Android Chrome
-        navigator.share({
-          title: 'SWCPC Volunteer Hours',
-          text: 'Log your volunteer hours',
-          url: window.location.href
-        }).catch(() => {});
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isIOS) {
+        tip.innerHTML = 'Tap the <strong>Share button (□↑)</strong> at the bottom of Safari, then choose <strong>"Add to Home Screen"</strong>.';
       } else {
-        // Fallback: show manual instructions
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isIOS) {
-          tip.textContent = 'Tap the Share button (□↑) at the bottom of Safari, then choose "Add to Home Screen".';
-        } else {
-          tip.textContent = 'Tap the menu (⋮) in your browser, then choose "Add to Home Screen".';
-        }
+        tip.innerHTML = 'Tap the <strong>menu (⋮)</strong> in your browser, then choose <strong>"Add to Home Screen"</strong>.';
       }
     }
   </script>
