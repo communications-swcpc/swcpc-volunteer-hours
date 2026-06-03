@@ -7,12 +7,17 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#2d6a4f"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "org.swcpc.volunteerhours"
+      "bundleIdentifier": "org.swcpc.volunteerhours",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow the app to use your camera to take photos of receipts.",
+        "NSPhotoLibraryUsageDescription": "Allow the app to access your photo library so you can attach receipt images."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +28,15 @@
     "plugins": [
       "expo-router",
       "expo-asset",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow the app to access your photos for receipt uploads.",
+          "cameraPermission": "Allow the app to use your camera to take photos of receipts."
+        }
+      ],
+      "expo-document-picker"
     ],
     "scheme": "volunteerhours",
     "extra": {

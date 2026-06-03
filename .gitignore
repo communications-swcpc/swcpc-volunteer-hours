@@ -3,6 +3,9 @@ node_modules/
 dist/
 ios/Pods/
 android/
+.DS_Store
+firebase-debug.log
+*.log
 *.orig.*
 *.jks
 *.p8

@@ -1,27 +1,42 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Image } from 'react-native';
+import { View } from 'react-native';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
+import { SessionProvider, useSession } from '@/context/SessionContext';
 
-export default function RootLayout() {
+function RootLayoutNav() {
+  const { session, isHydrating } = useSession();
+
+  useEffect(() => {
+    if (isHydrating) return;
+    if (!session) {
+      router.replace('/sign-in');
+    } else {
+      router.replace('/(home)');
+    }
+  }, [isHydrating, session]);
+
+  // While hydrating, render nothing (splash screen is still visible)
+  if (isHydrating) return null;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#2d6a4f' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: '700' },
+          headerShown: false,
           contentStyle: { backgroundColor: '#f9fafb' },
-          headerTitle: () => null,
-          headerLeft: () => (
-            <Image
-              source={require('../assets/logo.png')}
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', marginLeft: 8 }}
-              resizeMode="contain"
-            />
-          ),
         }}
       />
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SessionProvider>
+      <RootLayoutNav />
+    </SessionProvider>
   );
 }
