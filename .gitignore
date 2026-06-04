@@ -24,3 +24,4 @@ web-build/
 *service-account*.json
 *-service-account.json
 AuthKey_*.p8
+credentials/
