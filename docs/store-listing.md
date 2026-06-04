@@ -16,12 +16,13 @@ Sign-in is email-only and only works for emails already in the SWCPC volunteer d
   password — explain in Notes).
 - Google Play: add the demo email + instructions under *App content → App access*.
 
-Without this, expect rejection for "couldn't sign in." Suggested demo email: **🔶 (pick a
-real, low-risk volunteer email you control, e.g. communications@corridorpark.org)**.
+Without this, expect rejection for "couldn't sign in."
+
+**Demo email (verified valid in backend):** `store.account@gmail.com`
 
 Review notes text (paste into both):
 > This app is for Southwest Corridor Park Conservancy volunteers. Sign in is by email only
-> (no password) — the email must exist in our volunteer records. Use the demo email provided.
+> (no password) — enter the email and tap Sign In. Demo email: store.account@gmail.com
 > After sign-in you can log volunteer hours and submit a reimbursement with a receipt photo.
 
 ---
