@@ -65,7 +65,7 @@ export default function ReimbursementScreen() {
     if (!session || !validateForm()) return;
     const amt = Number(amount);
     if (budget && amt > budget.remaining) {
-      Alert.alert('Over budget', `You have $${budget.remaining.toFixed(2)} remaining. Requested amount would exceed your $250 annual limit.`);
+      Alert.alert('Over budget', `You have $${budget.remaining.toFixed(2)} remaining. Requested amount would exceed your $${budget.limit} annual limit.`);
       return;
     }
     setSubmitting(true);
@@ -113,7 +113,7 @@ export default function ReimbursementScreen() {
         ) : budget ? (
           <View style={styles.budgetBar}>
             <Text style={styles.budgetText}>
-              You have ${budget.remaining.toFixed(2)} of $250 remaining for {budget.year}
+              You have ${budget.remaining.toFixed(2)} of ${budget.limit} remaining for {budget.year}
             </Text>
           </View>
         ) : null}

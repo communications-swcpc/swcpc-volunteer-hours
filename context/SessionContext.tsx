@@ -20,6 +20,7 @@ interface BudgetData {
   year: number;
   spent: number;
   remaining: number;
+  limit: number;
 }
 
 interface SessionContextValue {
