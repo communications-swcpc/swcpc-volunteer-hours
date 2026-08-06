@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { FormField } from '@/components/FormField';
+import { AddressModal, AddressInput } from '@/components/AddressModal';
 import { API_BASE } from '@/constants/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/context/SessionContext';
@@ -19,6 +20,8 @@ export default function ReimbursementScreen() {
   const [receipt, setReceipt] = useState<{ uri: string; base64?: string; mime: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; description?: string; receipt?: string }>({});
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [addressSaving, setAddressSaving] = useState(false);
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -61,6 +64,33 @@ export default function ReimbursementScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const postReimbursement = async (address?: AddressInput) => {
+    const body: Record<string, unknown> = {
+      contact_id: session!.contactId,
+      email: session!.email,
+      amount: Number(amount),
+      description: description.trim(),
+      receipt_base64: receipt!.base64,
+      receipt_mime: receipt!.mime,
+    };
+    if (address) body.address = address;
+    const res = await fetch(`${API_BASE}/api/reimbursements`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return { res, data };
+  };
+
+  const onSubmitSuccess = () => {
+    Alert.alert('Submitted!', 'Your reimbursement request has been sent. The president and treasurer have been notified.');
+    setAmount('');
+    setDescription('');
+    setReceipt(null);
+    setAddressModalVisible(false);
+    setSubmitting(false);
+    refreshBudget();
+  };
+
   const handleSubmit = async () => {
     if (!session || !validateForm()) return;
     const amt = Number(amount);
@@ -68,40 +98,46 @@ export default function ReimbursementScreen() {
       Alert.alert('Over budget', `You have $${budget.remaining.toFixed(2)} remaining. Requested amount would exceed your $${budget.limit} annual limit.`);
       return;
     }
+    if (!receipt?.base64) {
+      Alert.alert('Error', 'Receipt is required. Please take a photo or choose a file.');
+      return;
+    }
     setSubmitting(true);
     try {
-      const body: Record<string, unknown> = {
-        contact_id: session.contactId,
-        email: session.email,
-        amount: amt,
-        description: description.trim(),
-      };
-      if (receipt?.base64) {
-        body.receipt_base64 = receipt.base64;
-        body.receipt_mime = receipt.mime;
-      } else {
-        Alert.alert('Error', 'Receipt is required. Please take a photo or choose a file.');
-        setSubmitting(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE}/api/reimbursements`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      const data = await res.json();
+      const { res, data } = await postReimbursement();
       if (res.ok && data.success) {
-        Alert.alert('Submitted!', 'Your reimbursement request has been sent. The president and treasurer have been notified.');
-        setAmount('');
-        setDescription('');
-        setReceipt(null);
-        refreshBudget();
+        onSubmitSuccess();
+      } else if (data.code === 'ADDRESS_REQUIRED') {
+        setAddressModalVisible(true);
       } else {
         Alert.alert('Error', data.error || 'Failed to submit. Please try again.');
+        setSubmitting(false);
+      }
+    } catch {
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddressSave = async (address: AddressInput) => {
+    setAddressSaving(true);
+    try {
+      const { res, data } = await postReimbursement(address);
+      if (res.ok && data.success) {
+        onSubmitSuccess();
+      } else {
+        Alert.alert('Error', data.error || 'Failed to save address and submit. Please try again.');
       }
     } catch {
       Alert.alert('Error', 'Network error. Please check your connection and try again.');
     } finally {
-      setSubmitting(false);
+      setAddressSaving(false);
     }
+  };
+
+  const handleAddressCancel = () => {
+    setAddressModalVisible(false);
+    setSubmitting(false);
   };
 
   return (
@@ -169,6 +205,12 @@ export default function ReimbursementScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <AddressModal
+        visible={addressModalVisible}
+        saving={addressSaving}
+        onCancel={handleAddressCancel}
+        onSave={handleAddressSave}
+      />
     </>
   );
 }
