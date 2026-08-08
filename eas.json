@@ -25,6 +25,10 @@
         "ascApiKeyPath": "./credentials/AuthKey_CQSUW98524.p8",
         "ascApiKeyId": "CQSUW98524",
         "ascApiKeyIssuerId": "a1013e96-cf98-491f-a842-cd5316413f54"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./credentials/google-play-service-account.json",
+        "track": "internal"
       }
     }
   }
