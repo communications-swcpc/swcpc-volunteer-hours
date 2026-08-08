@@ -6,7 +6,7 @@ import {
 import { Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { FormField } from '@/components/FormField';
 import { AddressModal, AddressInput } from '@/components/AddressModal';
 import { API_BASE } from '@/constants/api';
