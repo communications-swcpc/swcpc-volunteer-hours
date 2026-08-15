@@ -1,13 +1,13 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/context/SessionContext';
 
 export default function HomeScreen() {
-  const { session, budget, budgetLoading, canApprove, canComplete } = useSession();
+  const { session, canApprove, canComplete } = useSession();
   const isPrivileged = canApprove || canComplete;
 
   return (
@@ -17,19 +17,6 @@ export default function HomeScreen() {
         <Text style={styles.welcome}>
           Welcome back{session?.firstName ? `, ${session.firstName}` : ''}
         </Text>
-
-        {/* Budget card */}
-        {budgetLoading ? (
-          <View style={styles.budgetCard}>
-            <ActivityIndicator size="small" color="#1e40af" />
-          </View>
-        ) : budget ? (
-          <View style={styles.budgetCard}>
-            <Text style={styles.budgetText}>
-              ${budget.remaining.toFixed(2)} of $250 remaining — {budget.year} reimbursement budget
-            </Text>
-          </View>
-        ) : null}
 
         {/* Action cards */}
         <TouchableOpacity
@@ -94,16 +81,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginTop: 8,
   },
-  budgetCard: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 24,
-    alignItems: 'center',
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  budgetText: { fontSize: 14, color: '#1e40af', fontWeight: '500', textAlign: 'center' },
   actionCard: {
     backgroundColor: '#fff',
     borderRadius: 16,

@@ -2,10 +2,9 @@
 // volunteer's email can sign in as them. This is an intentional simplicity tradeoff for an
 // internal volunteer app with non-sensitive data.
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { API_BASE } from '@/constants/api';
 import * as SplashScreen from 'expo-splash-screen';
 
 const STORAGE_KEY = '@swcpc_reimb_session';
@@ -16,21 +15,11 @@ export interface Session {
   firstName?: string;
 }
 
-interface BudgetData {
-  year: number;
-  spent: number;
-  remaining: number;
-  limit: number;
-}
-
 interface SessionContextValue {
   session: Session | null;
   isHydrating: boolean; // true while AsyncStorage read is in-flight
   signIn: (s: Session) => Promise<void>;
   signOut: () => Promise<void>;
-  budget: BudgetData | null;
-  budgetLoading: boolean;
-  refreshBudget: () => Promise<void>;
   canApprove: boolean;
   canComplete: boolean;
 }
@@ -40,8 +29,6 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
-  const [budget, setBudget] = useState<BudgetData | null>(null);
-  const [budgetLoading, setBudgetLoading] = useState(false);
 
   useEffect(() => {
     // Keep splash screen visible until session is loaded
@@ -64,30 +51,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  const refreshBudget = useCallback(async () => {
-    if (!session?.contactId) return;
-    setBudgetLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/reimbursements/budget/${session.contactId}`);
-      if (res.ok) {
-        setBudget(await res.json());
-      }
-    } catch {
-      // ignore — budget is informational, not required
-    } finally {
-      setBudgetLoading(false);
-    }
-  }, [session?.contactId]);
-
-  // Fetch budget when session changes
-  useEffect(() => {
-    if (session) {
-      refreshBudget();
-    } else {
-      setBudget(null);
-    }
-  }, [session?.contactId]);
-
   const canApprove = useMemo(
     () => ['president@corridorpark.org', 'communications@corridorpark.org']
           .includes(session?.email?.toLowerCase() ?? ''),
@@ -108,12 +71,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await AsyncStorage.removeItem(STORAGE_KEY);
     setSession(null);
-    setBudget(null);
     router.replace('/sign-in');
   };
 
   return (
-    <SessionContext.Provider value={{ session, isHydrating, signIn, signOut, budget, budgetLoading, refreshBudget, canApprove, canComplete }}>
+    <SessionContext.Provider value={{ session, isHydrating, signIn, signOut, canApprove, canComplete }}>
       {children}
     </SessionContext.Provider>
   );
