@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/context/SessionContext';
 
 export default function ReimbursementScreen() {
-  const { session, budget, budgetLoading, refreshBudget } = useSession();
+  const { session } = useSession();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [receipt, setReceipt] = useState<{ uri: string; base64?: string; mime: string } | null>(null);
@@ -88,16 +88,10 @@ export default function ReimbursementScreen() {
     setReceipt(null);
     setAddressModalVisible(false);
     setSubmitting(false);
-    refreshBudget();
   };
 
   const handleSubmit = async () => {
     if (!session || !validateForm()) return;
-    const amt = Number(amount);
-    if (budget && amt > budget.remaining) {
-      Alert.alert('Over budget', `You have $${budget.remaining.toFixed(2)} remaining. Requested amount would exceed your $${budget.limit} annual limit.`);
-      return;
-    }
     if (!receipt?.base64) {
       Alert.alert('Error', 'Receipt is required. Please take a photo or choose a file.');
       return;
@@ -144,16 +138,6 @@ export default function ReimbursementScreen() {
     <>
       <Stack.Screen options={{ title: 'Reimbursement' }} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {budgetLoading ? (
-          <ActivityIndicator size="small" color="#2d6a4f" style={{ marginVertical: 12 }} />
-        ) : budget ? (
-          <View style={styles.budgetBar}>
-            <Text style={styles.budgetText}>
-              You have ${budget.remaining.toFixed(2)} of ${budget.limit} remaining for {budget.year}
-            </Text>
-          </View>
-        ) : null}
-
         <View style={styles.card}>
           <FormField label="Amount ($)" required error={errors.amount}>
             <TextInput
@@ -218,8 +202,6 @@ export default function ReimbursementScreen() {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
-  budgetBar: { paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#eff6ff', borderRadius: 8, marginBottom: 16 },
-  budgetText: { fontSize: 14, color: '#1e40af', fontWeight: '500' },
   card: {
     backgroundColor: '#fff', borderRadius: 12, padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
