@@ -52,7 +52,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const canApprove = useMemo(
-    () => ['president@corridorpark.org', 'communications@corridorpark.org']
+    () => ['vicepresident@corridorpark.org', 'communications@corridorpark.org']
           .includes(session?.email?.toLowerCase() ?? ''),
     [session?.email]
   );

@@ -82,7 +82,7 @@ export default function ReimbursementScreen() {
   };
 
   const onSubmitSuccess = () => {
-    Alert.alert('Submitted!', 'Your reimbursement request has been sent. The president and treasurer have been notified.');
+    Alert.alert('Submitted!', 'Your reimbursement request has been sent. The vice president and treasurer have been notified.');
     setAmount('');
     setDescription('');
     setReceipt(null);

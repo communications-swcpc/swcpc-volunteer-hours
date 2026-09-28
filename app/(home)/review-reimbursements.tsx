@@ -179,7 +179,7 @@ export default function ReviewReimbursementsScreen() {
 
   // Counts for items the user can't act on but should still know about
   // (e.g. the treasurer can't approve, but should see that requests are
-  // waiting on the president).
+  // waiting on the vice president).
   const notices: string[] = [];
   if (!canApprove && pending.length > 0) {
     notices.push(`${pending.length} waiting for approval`);
