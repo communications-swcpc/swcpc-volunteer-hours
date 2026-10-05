@@ -7,18 +7,19 @@ const record = { request_id: 'fixture-request', contact_id: 'fixture-contact', e
   amount: '25', description: '', receipt_url: 'https://example.org/receipt', year: '2026', status: 'APPROVED',
   submitted_at: '', approved_by: '', approved_at: '', completed_by: '', completed_at: '', payment_revision: 1, check_number: '00123' };
 const receipt = { command_id: command.command_id, event_id: 'fixture-event', revision: 1, reimbursement: record };
-const make = (transport, credential = 'fixture-credential-not-real') => createPaymentClient({ baseURL: 'https://fixture.invalid', limits,
-  getVerifiedCredential: async () => credential, transport });
-test('missing verified credential does not call transport', async () => {
+const make = (transport, email = 'treasurer@corridorpark.org') => createPaymentClient({ baseURL: 'https://fixture.invalid', limits,
+  getClaimedEmail: async () => email, transport });
+test('missing claimed email does not call transport', async () => {
   let called = false;
   await assert.rejects(make(async () => { called = true; }, null).mutate(record.request_id, 'SAVE', command), error => error.code === 'UNAUTHORIZED');
   assert.equal(called, false);
 });
-test('uses bearer credentials with no email-header fallback and validates receipt', async () => {
+test('uses original email header without a bearer credential and validates receipt', async () => {
   let captured;
   const result = await make(async (url, options) => { captured = { url, options }; return Response.json({ success: true, receipt }); }).mutate(record.request_id, 'SAVE', command);
   assert.equal(result.reimbursement.check_number, '00123');
-  assert.equal(captured.options.headers['x-mobile-email'], undefined);
+  assert.equal(captured.options.headers['x-mobile-email'], 'treasurer@corridorpark.org');
+  assert.equal(captured.options.headers.Authorization, undefined);
   assert.equal(captured.options.method, 'PATCH');
 });
 test('unknown operation fails before transport', async () => {
@@ -52,8 +53,8 @@ test('reconciliation rejects a receipt from another command/request', async () =
   await assert.rejects(make(async () => Response.json({ state: 'COMMITTED', receipt: { ...receipt, command_id: 'different-command-0002' } })).reconcile(record.request_id, command.command_id));
 });
 test('single-request decoding preserves COMPLETE and rejects malformed JSON shapes', async () => {
-  assert.equal((await make(async () => Response.json({ reimbursement: { ...record, status: 'COMPLETE' } })).read(record.request_id)).status, 'COMPLETE');
-  await assert.rejects(make(async () => Response.json({ reimbursement: { ...record, status: 'PAID' } })).read(record.request_id));
+  assert.equal((await make(async () => Response.json([{ ...record, status: 'COMPLETE' }])).read(record.request_id)).status, 'COMPLETE');
+  await assert.rejects(make(async () => Response.json([{ ...record, status: 'PAID' }])).read(record.request_id));
 });
 
  test('ambiguous JSON gateway failures retain unknown mutation outcome', async () => {

@@ -9,6 +9,7 @@ interface Props {
   canEdit: boolean;
   completionAllowed: boolean;
   completionBlockedMessage?: string;
+  completionConfirmationMessage?: string;
   dateLabel: string;
   today: string;
   limits: PaymentValidationLimits;
@@ -18,13 +19,15 @@ interface Props {
   onReconcile: () => Promise<'COMMITTED' | 'ABSENT' | 'PENDING' | 'UNKNOWN'>;
   onDirtyChange?: (dirty: boolean) => void;
   onHistory?: () => void;
+  pendingOutcome?: boolean;
+  onActivityChange?: (active: boolean) => void;
 }
-/** Unmounted. No auth issuance, persistence, offline replay or stored sensitive drafts. */
+/** Native payment UI. Identity is the baseline claimed email; roles enforced by backend allowlists. */
 export function ReimbursementPaymentEditor(props: Props) {
   if (!props.canEdit || !props.identityKey || props.request.status === 'PENDING') return null;
   return <Draft key={`${props.identityKey}:${props.request.request_id}`} {...props} />;
 }
-function Draft({ request, completionAllowed, completionBlockedMessage, dateLabel, today, limits, onSubmit, onCancel, onHistory, onReconcile, onDirtyChange, onResetPayment }: Props) {
+function Draft({ request, completionAllowed, completionBlockedMessage, completionConfirmationMessage, dateLabel, today, limits, onSubmit, onCancel, onHistory, onReconcile, onDirtyChange, onResetPayment, pendingOutcome = false, onActivityChange }: Props) {
   const [draft, setDraft] = useState(() => normalizePaymentDetails(request, limits));
   const [baseline] = useState(() => normalizePaymentDetails(request, limits));
   const [expectedRevision] = useState(() => request.payment_revision);
@@ -32,11 +35,14 @@ function Draft({ request, completionAllowed, completionBlockedMessage, dateLabel
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [uncertain, setUncertain] = useState(false);
+  const [uncertainState, setUncertain] = useState(pendingOutcome);
+  const uncertain = uncertainState || pendingOutcome;
   const [reconciledCommit, setReconciledCommit] = useState(false);
   const alive = useRef(true);
   const submitting = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => { setUncertain(pendingOutcome); }, [pendingOutcome]);
+  useEffect(() => { onActivityChange?.(busy || uncertain); return () => onActivityChange?.(false); }, [busy, uncertain, onActivityChange]);
   const dirty = JSON.stringify(baseline) !== JSON.stringify(draft) || !!reason;
   useEffect(() => { onDirtyChange?.(dirty || uncertain); }, [dirty, uncertain, onDirtyChange]);
   const reconcile = async () => {
@@ -86,11 +92,11 @@ function Draft({ request, completionAllowed, completionBlockedMessage, dateLabel
     {!completionAllowed && request.status === 'APPROVED' ? <Text>{completionBlockedMessage}</Text> : null}
     <Button title={busy ? 'Processing…' : 'Save details'} disabled={busy || uncertain || stale || reconciledCommit} onPress={() => submit('SAVE')} />
     {request.status === 'APPROVED' ? <Button title="Confirm & complete" disabled={busy || uncertain || stale || reconciledCommit || !completionAllowed} onPress={() => {
-      Alert.alert('Complete reimbursement?', 'Confirm this reimbursement is ready to complete.', [
+      Alert.alert('Complete reimbursement?', completionConfirmationMessage ?? 'Confirm this reimbursement is ready to complete.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Confirm & complete', onPress: () => { if (alive.current) submit('COMPLETE'); } },
       ]);
     }} /> : null}
-    {request.status === 'COMPLETE' && onHistory ? <Button title="View history" disabled={busy} onPress={onHistory} /> : null}
+    {onHistory ? <Button title="View history" disabled={busy} onPress={onHistory} /> : null}
     {onResetPayment ? <Button title="Reset payment for reissue" disabled={busy || uncertain || stale || reconciledCommit} onPress={() => {
       Alert.alert('Reset payment for reissue?', 'Archive prior payment and completion, clear active details, and return to approved awaiting reissue.', [
         { text: 'Cancel', style: 'cancel' }, { text: 'Reset payment', onPress: () => { if (alive.current) submit('RESET'); } },

@@ -203,7 +203,7 @@ export function parseReviewerReimbursements(value: unknown, limits: PaymentValid
   return value.map(item => parseReviewerReimbursement(item, limits));
 }
 
-/** Financial staff only. Authorize the verified caller BEFORE invoking this. */
+/** Financial staff only. Authorize the server-resolved caller BEFORE invoking this; mobile email is a claim. */
 export function projectFinancialReviewerReimbursement(value: ReimbursementBase & Partial<PaymentDetails> & {
   payment_revision?: string | number; payment_updated_by?: string; payment_updated_at?: string;
   full_name?: string; address?: ReviewerReimbursement['address'];

@@ -1,0 +1,9 @@
+# J027 local native payment candidate
+
+Phone sign-in remains email-in-ContactCRM, unchanged. Original x-mobile-email transport and exact reviewer role allowlists remain. This is a claimed identity: knowing a privileged email can impersonate its financial permissions. Audit actor is recorded claimed email, not proven ownership. No new auth extension, browser payment fallback, dependency, callback, credential or infrastructure.
+
+Native review now includes PENDING/APPROVED/COMPLETE, separate SAVE and confirmed COMPLETE, correction, reason-required payment reissue preserving approval, and readonly history. Scott cannot edit payment; Rebecca/John can. Mobile/API completion preserves confirmation-only address behavior; web found-contact blocker is separate. Optional fields are not approval prerequisites.
+
+Unknown mutations retain only request/command IDs in account-scoped AsyncStorage; never check values/date/note/reason or financial drafts. On restart, pending commands block new writes until original receipt reconciliation. Absence alone does not prove no in-flight write; UNKNOWN stays blocked. No automatic mutation retries. Account switch clears financial UI and keeps old account recovery separately. Uncertain saved details can be recovered from server; unsaved drafts are memory-only.
+
+Local mocked API/client/interaction coverage does not substitute for actual signed-device navigation, keyboard, back, modal, storage/restart, account-switch and accessibility QA. Existing package org.swcpc.volunteerhours, app version1.0.5, SDK54 and EAS project are unchanged. Final additional phone scope, schema backup/restore, audit-key recovery/privacy, coordinated old-client update and release authorization remain. No paid builds, store publication, production schema/data/auth changes or activation have occurred.

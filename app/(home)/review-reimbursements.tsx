@@ -1,377 +1,188 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  SectionList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  RefreshControl,
-  Linking,
-} from 'react-native';
-import { router } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Button, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { router, useNavigation } from 'expo-router';
+import { usePreventRemove, type NavigationAction } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSession } from '@/context/SessionContext';
 import { API_BASE } from '@/constants/api';
+import { ReimbursementPaymentEditor } from '@/components/ReimbursementPaymentEditor';
+import { createPaymentClient, PaymentClientError } from '@/services/reimbursement-payments';
+import { PAYMENT_LIMITS, parsePaymentCommand, type PaymentDetails, type ReviewerReimbursement } from '@/shared/reimbursement-payment';
 
-interface Address {
-  street: string;
-  city: string;
-  state: string;
-  zip: string;
-}
-
-interface Reimbursement {
-  request_id: string;
-  contact_id: string;
-  email: string;
-  full_name: string;
-  address: Address | null;
-  amount: string;
-  description: string;
-  receipt_url: string;
-  year: string;
-  status: 'PENDING' | 'APPROVED' | 'COMPLETE';
-  submitted_at: string;
-  approved_by: string;
-  approved_at: string;
-  completed_by: string;
-  completed_at: string;
-}
-
-interface Section {
-  title: string;
-  data: Reimbursement[];
-}
-
+type Recovery = Record<string, string>;
+type History = Awaited<ReturnType<ReturnType<typeof createPaymentClient>['history']>>;
 export default function ReviewReimbursementsScreen() {
   const { session, canApprove, canComplete } = useSession();
-
-  const [pending, setPending] = useState<Reimbursement[]>([]);
-  const [approved, setApproved] = useState<Reimbursement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [signInRequired, setSignInRequired] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-
-  // Route guard
-  useEffect(() => {
-    if (!canApprove && !canComplete) {
-      router.replace('/(home)');
-    }
-  }, [canApprove, canComplete]);
-
-  const fetchData = useCallback(async () => {
-    if (!session?.email) return;
-    setError(null);
-    try {
-      const [pendingRes, approvedRes] = await Promise.all([
-        fetch(`${API_BASE}/api/reimbursements?status=PENDING`),
-        fetch(`${API_BASE}/api/reimbursements?status=APPROVED`),
-      ]);
-
-      if ([pendingRes.status, approvedRes.status].some(status => status === 401 || status === 403)) {
-        setPending([]); setApproved([]); setSignInRequired(true);
-        throw new Error('Verified staff sign-in is required. Your app email sign-in does not verify access to reimbursements.');
-      }
-      if (!pendingRes.ok || !approvedRes.ok) {
-        throw new Error('Failed to load reimbursements');
-      }
-
-      const [pendingData, approvedData] = await Promise.all([
-        pendingRes.json() as Promise<Reimbursement[]>,
-        approvedRes.json() as Promise<Reimbursement[]>,
-      ]);
-
-      setPending(pendingData);
-      setApproved(approvedData);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load reimbursements');
-    } finally {
-      setLoading(false);
-    }
-  }, [session?.email]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleApprove = (item: Reimbursement) => {
-    Alert.alert(
-      'Approve Reimbursement',
-      `Approve $${Number(item.amount).toFixed(2)} for ${item.full_name}?\n\n"${item.description}"`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          style: 'destructive',
-          onPress: () => performApprove(item.request_id),
-        },
-      ]
-    );
-  };
-
-  const performApprove = async (id: string) => {
-    if (!session?.email) return;
-    setProcessingId(id);
-    try {
-      const res = await fetch(`${API_BASE}/api/reimbursements/${id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (res.status === 409 || res.status === 404) {
-        // Item already acted on elsewhere — silently refresh
-        await fetchData();
-        return;
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        Alert.alert('Error', data.error || 'Failed to approve reimbursement');
-        return;
-      }
-      await fetchData();
-    } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleComplete = (item: Reimbursement) => {
-    Alert.alert(
-      'Mark as Complete',
-      `Mark $${Number(item.amount).toFixed(2)} for ${item.full_name} as paid?\n\n"${item.description}"`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark Complete',
-          style: 'destructive',
-          onPress: () => performComplete(item.request_id),
-        },
-      ]
-    );
-  };
-
-  const performComplete = async (id: string) => {
-    if (!session?.email) return;
-    setProcessingId(id);
-    try {
-      const res = await fetch(`${API_BASE}/api/reimbursements/${id}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (res.status === 409 || res.status === 404) {
-        await fetchData();
-        return;
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        Alert.alert('Error', data.error || 'Failed to mark reimbursement complete');
-        return;
-      }
-      await fetchData();
-    } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const sections: Section[] = [
-    { title: 'Pending Approval', data: canApprove ? pending : [] },
-    { title: 'Awaiting Payment', data: canComplete ? approved : [] },
-  ].filter((s) => s.data.length > 0);
-
-  // Counts for items the user can't act on but should still know about
-  // (e.g. the treasurer can't approve, but should see that requests are
-  // waiting on the vice president).
-  const notices: string[] = [];
-  if (!canApprove && pending.length > 0) {
-    notices.push(`${pending.length} waiting for approval`);
-  }
-  if (!canComplete && approved.length > 0) {
-    notices.push(`${approved.length} approved and awaiting payment`);
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2d6a4f" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{error}</Text>
-        {signInRequired ? <TouchableOpacity style={styles.retryButton} onPress={() => {
-          Linking.openURL(`${API_BASE}/reimbursements`).catch(() => Alert.alert('Unable to open dashboard', 'Open the staff reimbursement dashboard in your browser.'));
-        }}>
-          <Text style={styles.retryButtonText}>Open secure staff dashboard</Text>
-        </TouchableOpacity> : <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>}
-      </View>
-    );
-  }
-
-  return (
-    <SectionList
-      style={styles.list}
-      contentContainerStyle={styles.listContent}
-      sections={sections}
-      keyExtractor={(item) => item.request_id}
-      refreshControl={
-        <RefreshControl
-          refreshing={false}
-          onRefresh={fetchData}
-          tintColor="#2d6a4f"
-        />
-      }
-      renderSectionHeader={({ section }) => {
-        if (section.data.length === 0) return null;
-        return (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
-          </View>
-        );
-      }}
-      renderItem={({ item }) => {
-        const isProcessing = processingId === item.request_id;
-        const isPending = item.status === 'PENDING';
-        return (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardNameBlock}>
-                <Text style={styles.cardName}>{item.full_name}</Text>
-                <Text style={styles.cardEmail}>{item.email}</Text>
-              </View>
-              <Text style={styles.cardAmount}>${Number(item.amount).toFixed(2)}</Text>
-            </View>
-            <Text style={styles.cardDescription}>{item.description}</Text>
-            <Text style={styles.cardDate}>
-              Submitted {new Date(item.submitted_at).toLocaleDateString()}
-            </Text>
-            {!isPending && (
-              <View style={styles.addressBlock}>
-                <Text style={styles.addressLabel}>Pay to</Text>
-                <Text style={styles.addressName}>{item.full_name}</Text>
-                {item.address ? (
-                  <>
-                    <Text style={styles.addressText}>{item.address.street}</Text>
-                    <Text style={styles.addressText}>
-                      {[item.address.city, item.address.state, item.address.zip].filter(Boolean).join(', ')}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.addressText}>—</Text>
-                )}
-              </View>
-            )}
-            <TouchableOpacity
-              style={[styles.actionButton, isProcessing && styles.actionButtonDisabled]}
-              onPress={() => isPending ? handleApprove(item) : handleComplete(item)}
-              disabled={isProcessing}
-              activeOpacity={0.8}
-            >
-              {isProcessing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.actionButtonText}>
-                  {isPending ? 'Approve' : 'Mark Complete'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        );
-      }}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>No reimbursements to review</Text>
-          {notices.length > 0 && (
-            <Text style={styles.emptyNoticeText}>{notices.join(' · ')}</Text>
-          )}
-        </View>
-      }
-    />
-  );
+  useEffect(() => { if (!canApprove && !canComplete) router.replace('/(home)'); }, [canApprove, canComplete]);
+  if (!session || !canApprove && !canComplete) return null;
+  // Remount and clear financial state on account change; old account recovery remains separately stored.
+  return <Review key={session.email} email={session.email} canApprove={canApprove} canComplete={canComplete} />;
 }
-
-const styles = StyleSheet.create({
-  list: { flex: 1 },
-  listContent: { padding: 16, paddingBottom: 40 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  errorText: { fontSize: 15, color: '#dc2626', textAlign: 'center', marginBottom: 16 },
-  retryButton: {
-    backgroundColor: '#2d6a4f',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  sectionHeader: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  sectionHeaderText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  cardNameBlock: { flex: 1, marginRight: 8 },
-  cardName: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  cardEmail: { fontSize: 13, color: '#6b7280' },
-  cardAmount: { fontSize: 16, fontWeight: '700', color: '#2d6a4f' },
-  cardDescription: { fontSize: 13, color: '#374151', marginBottom: 4 },
-  cardDate: { fontSize: 12, color: '#9ca3af', marginBottom: 12 },
-  addressBlock: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
-  addressLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  addressName: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 2 },
-  addressText: { fontSize: 13, color: '#374151' },
-  actionButton: {
-    backgroundColor: '#2d6a4f',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    minHeight: 40,
-    justifyContent: 'center',
-  },
-  actionButtonDisabled: { opacity: 0.6 },
-  actionButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  emptyText: { fontSize: 15, color: '#9ca3af', textAlign: 'center' },
-  emptyNoticeText: { fontSize: 13, color: '#6b7280', textAlign: 'center', marginTop: 8 },
-});
+function Review({ email, canApprove, canComplete }: { email: string; canApprove: boolean; canComplete: boolean }) {
+  const client = useMemo(() => createPaymentClient({ baseURL: API_BASE, limits: PAYMENT_LIMITS,
+    getClaimedEmail: async () => email, transport: fetch }), [email]);
+  const recoveryKey = `@swcpc_payment_commands:${email.toLowerCase()}`;
+  const [rows, setRows] = useState<ReviewerReimbursement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<ReviewerReimbursement | null>(null);
+  const [history, setHistory] = useState<History | null>(null);
+  const [historyTitle, setHistoryTitle] = useState('');
+  const [pending, setPending] = useState<Recovery>({});
+  const pendingRef = useRef<Recovery>({});
+  const [dirty, setDirty] = useState(false);
+  const [active, setActive] = useState(false);
+  const dirtyRef = useRef(false), activeRef = useRef(false), selectedRef = useRef<ReviewerReimbursement | null>(null);
+  const inFlight = useRef(false), ready = useRef(false), alive = useRef(true);
+  const navigation = useNavigation();
+  const refresh = useCallback(async () => {
+    try { const data = await client.list(); if (alive.current) { setRows(data); setError('');
+      setSelected(current => current ? data.find(row => row.request_id === current.request_id) ?? current : null); } }
+    catch { if (alive.current) setError('Unable to load reimbursements. Try refresh.'); }
+    finally { if (alive.current) setLoading(false); }
+  }, [client]);
+  useEffect(() => {
+    alive.current = true;
+    (async () => {
+      try {
+        const json = await AsyncStorage.getItem(recoveryKey);
+        const parsed: unknown = json ? JSON.parse(json) : {};
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+          || Object.entries(parsed).some(([id]) => !id)) throw new Error('Invalid recovery');
+        for (const command of Object.values(parsed)) parsePaymentCommand({ command_id: command, expected_revision: 0 }, PAYMENT_LIMITS);
+        if (!alive.current) return;
+        pendingRef.current = parsed as Recovery; setPending(parsed as Recovery); ready.current = true;
+        await refresh();
+      } catch { if (alive.current) { setError('Payment recovery metadata unavailable. Do not submit payments; restart and retry.'); setLoading(false); } }
+    })();
+    return () => { alive.current = false; };
+  }, [recoveryKey, refresh]);
+  const [leaveAction, setLeaveAction] = useState<NavigationAction | null>(null);
+  const blocked = active || dirty || !!(selected && pending[selected.request_id]);
+  usePreventRemove(blocked, ({ data }) => {
+    if (activeRef.current || inFlight.current || selectedRef.current && pendingRef.current[selectedRef.current.request_id]) {
+      Alert.alert('Payment outcome pending', 'Reconcile the original payment command before leaving this screen.');
+    } else if (dirtyRef.current) {
+      Alert.alert('Discard unsaved payment details?', '', [
+        { text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => {
+          dirtyRef.current = false; setDirty(false); setSelected(null); selectedRef.current = null; setLeaveAction(data.action);
+        } },
+      ]);
+    }
+  });
+  useEffect(() => { if (leaveAction && !blocked) { navigation.dispatch(leaveAction); setLeaveAction(null); } }, [leaveAction, blocked, navigation]);
+  const onActivityChange = useCallback((value: boolean) => { activeRef.current = value; setActive(value); }, []);
+  const onDirtyChange = useCallback((value: boolean) => { dirtyRef.current = value; setDirty(value); }, []);
+  const storeRecovery = async (next: Recovery) => {
+    await AsyncStorage.setItem(recoveryKey, JSON.stringify(next));
+    pendingRef.current = next; if (alive.current) setPending(next);
+  };
+  const clearRecovery = async (id: string) => { const next = { ...pendingRef.current }; delete next[id]; await storeRecovery(next); };
+  const submit = async (operation: 'SAVE' | 'COMPLETE' | 'RESET', details: PaymentDetails | undefined, reason: string, revision: number) => {
+    const row = selectedRef.current;
+    if (!row || !ready.current || inFlight.current || pendingRef.current[row.request_id]) throw new PaymentClientError('CONFLICT', 'Reconcile the original command before saving.');
+    inFlight.current = true;
+    let started = false;
+    try {
+      const command = await client.createCommand();
+      // Persist opaque UUID only before transport; no payment fields, reasons or financial drafts stored.
+      await storeRecovery({ ...pendingRef.current, [row.request_id]: command });
+      if (!alive.current) { await clearRecovery(row.request_id); return; }
+      started = true;
+      await client.mutate(row.request_id, operation, { command_id: command, expected_revision: revision,
+        ...(details ? { details } : {}), ...(reason ? { reason } : {}) });
+      await clearRecovery(row.request_id);
+      if (alive.current) { setSelected(null); selectedRef.current = null; setDirty(false); dirtyRef.current = false; }
+      await refresh();
+    } catch (failure) {
+      if (started && failure instanceof PaymentClientError && !failure.outcomeUnknown) {
+        await clearRecovery(row.request_id);
+        if (failure.code === 'CONFLICT') await refresh();
+      }
+      if (!started && pendingRef.current[row.request_id]) await clearRecovery(row.request_id);
+      if (!started && !(failure instanceof PaymentClientError)) throw new PaymentClientError('UNAVAILABLE', 'No payment submitted. Recovery storage unavailable.');
+      throw failure;
+    } finally { inFlight.current = false; }
+  };
+  const reconcile = async () => {
+    const row = selectedRef.current, command = row && pendingRef.current[row.request_id];
+    if (!row || !command) return 'UNKNOWN' as const;
+    const result = await client.reconcile(row.request_id, command);
+    if (result.state === 'COMMITTED') {
+      await clearRecovery(row.request_id);
+      if (alive.current) { setSelected(null); selectedRef.current = null; setDirty(false); dirtyRef.current = false; }
+      await refresh();
+    }
+    return result.state;
+  };
+  const openHistory = async (row: ReviewerReimbursement) => {
+    try { const events = await client.history(row.request_id); if (alive.current) { setHistory(events); setHistoryTitle(row.full_name); } }
+    catch { if (alive.current) Alert.alert('History unavailable', 'Refresh and try again.'); }
+  };
+  const close = () => {
+    if (activeRef.current || inFlight.current || selectedRef.current && pendingRef.current[selectedRef.current.request_id]) return;
+    const discard = () => { setSelected(null); selectedRef.current = null; dirtyRef.current = false; setDirty(false); };
+    if (dirtyRef.current) Alert.alert('Discard unsaved payment details?', '', [{ text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: discard }]);
+    else discard();
+  };
+  const approve = (row: ReviewerReimbursement) => Alert.alert('Approve reimbursement?', `$${Number(row.amount).toFixed(2)} for ${row.full_name}`, [
+    { text: 'Cancel', style: 'cancel' }, { text: 'Approve', onPress: async () => {
+      if (inFlight.current || !ready.current) return;
+      inFlight.current = true; setActive(true); activeRef.current = true;
+      try {
+        const response = await fetch(`${API_BASE}/api/reimbursements/${encodeURIComponent(row.request_id)}/approve`, { method: 'POST', headers: { 'x-mobile-email': email } });
+        if (!response.ok) throw new Error('Approval rejected');
+        await refresh();
+      } catch { if (alive.current) Alert.alert('Approval outcome uncertain', 'Refresh before acting again.'); }
+      finally { inFlight.current = false; if (alive.current) setActive(false); activeRef.current = false; }
+    } },
+  ]);
+  const calendarNow = new Date();
+  const today = `${calendarNow.getFullYear()}-${String(calendarNow.getMonth() + 1).padStart(2, '0')}-${String(calendarNow.getDate()).padStart(2, '0')}`;
+  const historyPanel = <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}><Text>Payment history · {historyTitle}</Text>
+    {history?.length === 0 ? <Text>No payment events recorded.</Text> : null}
+    {history?.map((event, index) => <View key={index} style={{ gap: 4 }}><Text>{event.operation} · {event.occurred_at}</Text>
+      <Text>Recorded email: {event.actor}</Text><Text>Reason: {event.reason || '—'}</Text>
+      <Text>Before: {event.before.status} · Check {event.before.check_number || '—'} · {event.before.check_date || '—'}</Text><Text>{event.before.payment_note}</Text>
+      <Text>After: {event.after.status} · Check {event.after.check_number || '—'} · {event.after.check_date || '—'}</Text><Text>{event.after.payment_note}</Text>
+    </View>)}<Button title="Close history" onPress={() => setHistory(null)} />
+  </ScrollView>;
+  if (loading) return <ActivityIndicator accessibilityLabel="Loading reimbursements" />;
+  return <View style={{ flex: 1, padding: 16 }}>
+    {error ? <Text accessibilityRole="alert">{error}</Text> : null}
+    <Button title="Refresh reimbursements" disabled={active || !!selected} onPress={refresh} />
+    <ScrollView>
+      {(['PENDING', 'APPROVED', 'COMPLETE'] as const).map(status => <View key={status} style={{ gap: 12, marginVertical: 12 }}>
+        <Text style={{ fontWeight: 'bold' }}>{status === 'PENDING' ? 'Pending approval' : status === 'APPROVED' ? 'Awaiting payment' : 'Completed history'}</Text>
+        {rows.filter(row => row.status === status).map(row => <View key={row.request_id} style={{ padding: 12, borderWidth: 1, borderColor: '#ccc', gap: 8 }}>
+          <Text>{row.full_name} · ${Number(row.amount).toFixed(2)}</Text><Text>{row.description}</Text>
+          {status !== 'PENDING' ? <Text>Pay to: {row.address ? `${row.address.street}, ${row.address.city}, ${row.address.state} ${row.address.zip}` : 'No mailing address on file'}</Text> : null}
+          {status === 'PENDING' && canApprove ? <Button title="Approve" disabled={active} onPress={() => approve(row)} /> : null}
+          {status !== 'PENDING' && canComplete ? <TouchableOpacity accessibilityRole="button" onPress={() => { selectedRef.current = row; setSelected(row); }}>
+            <Text>{pending[row.request_id] ? 'Reconcile pending payment' : status === 'COMPLETE' ? 'Payment details / correction' : 'Payment details'}</Text>
+          </TouchableOpacity> : null}
+          {status !== 'PENDING' ? <Button title="View payment history" disabled={active} onPress={() => openHistory(row)} /> : null}
+        </View>)}
+      </View>)}
+    </ScrollView>
+    <Modal visible={!!selected} onRequestClose={() => { if (history !== null) setHistory(null); else close(); }} animationType="slide">
+      <ScrollView style={{ display: history !== null ? 'none' : 'flex' }}><Text style={{ padding: 16 }}>Payment details</Text>
+        {selected ? <ReimbursementPaymentEditor request={selected} identityKey={email} canEdit={canComplete}
+          completionAllowed={true}
+          completionConfirmationMessage={selected.address ? "Confirm this reimbursement is ready to complete." : "No mailing address is on file. Confirm this reimbursement is ready to complete."}
+          dateLabel="Check written / issued date" today={today} limits={PAYMENT_LIMITS}
+          pendingOutcome={!!pending[selected.request_id]}
+          onActivityChange={onActivityChange}
+          onDirtyChange={onDirtyChange}
+          onSubmit={(operation, details, reason, revision) => submit(operation, details, reason, revision)}
+          onResetPayment={(reason, revision) => submit('RESET', undefined, reason, revision)}
+          onReconcile={reconcile} onCancel={() => { setSelected(null); selectedRef.current = null; setDirty(false); dirtyRef.current = false; }} onHistory={() => openHistory(selected)} /> : null}
+        <Text>{dirty ? 'Unsaved details stay on this screen only.' : ''}</Text>
+      </ScrollView>
+      {history !== null ? historyPanel : null}
+    </Modal>
+    <Modal visible={history !== null && !selected} onRequestClose={() => setHistory(null)} animationType="slide">
+      {historyPanel}
+    </Modal>
+  </View>;
+}
