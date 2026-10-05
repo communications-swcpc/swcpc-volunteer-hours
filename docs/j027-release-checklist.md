@@ -28,12 +28,12 @@ create new keys, change permissions or register identities without specific appr
 
 ## Gates before builds
 
-- Obtain exact approved plan text; confirm written/issued date and audit/reset/concurrency decisions.
+- Exact approved plan and subsequent decisions are confirmed: issued/written date, check max50, note max2000, reason-required payment reissue to APPROVED preserving approval, audit only Rebecca/Scott/John, five years from each event timestamp, durable concurrency mandatory. No additional product-choice approval needed.
 - Finish shared backend+web/native functionality and verified native sign-in. Forged x-mobile-email must no longer grant privileged list, internal-note, approval, completion, correction or history access after cutover. Existing email lookup must never mint privileged credentials.
 - Confirm old-client update/sign-in behavior and coordinated backend/app rollout; preserve volunteer submission/caps. No interval in rollout may leave a header-only privileged mutation path enabled.
 - Authorize staging schema migration separately after backup/header verification; test rollback without erasing issued-check audit evidence.
 - Run web unit/integration/build/type/lint checks and mobile typecheck/contract/interaction checks. Resolve or explicitly track existing unrelated lint failures.
-- On authorized staging/fixtures, verify iOS+Android+web save APPROVED without completing, optional complete, COMPLETE correction/history, reset archive/clear, shared reloads and role boundaries. Check 00123, leap/impossible dates/timezones, multiline/formula/HTML notes, blank legacy data, address safeguards, cancellation/draft switching, sign-out, token expiry, stale updates, duplicate commands, network timeout reconciliation and audit failures. No live test emails or production financial edits.
+- On authorized staging/fixtures, verify iOS+Android+web save APPROVED without completing, optional complete, COMPLETE correction/history, payment reissue preserving approval with archived prior payment/completion, shared reloads and role boundaries. Check 00123, leap/impossible dates/timezones, multiline/formula/HTML notes, blank legacy data, address safeguards, cancellation/draft switching, sign-out, token expiry, stale updates, duplicate commands, network timeout reconciliation and audit failures. No live test emails or production financial edits.
 - Obtain final architect and senior developer review; verify diff contains no unrelated files or website changes.
 
 ## Versions and build selection (proposed, not applied)
@@ -60,7 +60,7 @@ For this change, verified reimbursement identity/privacy is a release prerequisi
 both newly added fields and existing privileged operations. Its older “track separately”
 wording must not be used to waive this gate.
 
-Current evidence: mobile typecheck and 12 synthetic contract tests pass; portable contract
+Current evidence: mobile typecheck,12 synthetic contract tests and11 mock client tests pass; web/native editor logic browser fixtures pass (native primitive shim, not deviceQA). Components/routes remain disconnected pending durable persistence and verified native identity; portable contract
 matches backend byte-for-byte. Real-device QA/build/store checks are pending; no version,
 build number, signing, credentials, store state, OTA or production backend was changed.
 
