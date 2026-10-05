@@ -60,8 +60,10 @@ For this change, verified reimbursement identity/privacy is a release prerequisi
 both newly added fields and existing privileged operations. Its older “track separately”
 wording must not be used to waive this gate.
 
-Current evidence: mobile typecheck,12 synthetic contract tests and11 mock client tests pass; web/native editor logic browser fixtures pass (native primitive shim, not deviceQA). Components/routes remain disconnected pending completed Sheets integration, audit key retention/recovery and verified native identity; portable contract
+Current evidence: mobile typecheck,12 synthetic contract tests and11 mock client tests pass; web/native editor logic browser fixtures pass (native primitive shim, not deviceQA). Web dashboard/controller is integrated locally and payment operations default disabled pending authorized schema, audit key retention/recovery and privacy decisions. Native editor/client remains disconnected pending verified native identity; portable contract
 matches backend byte-for-byte. Real-device QA/build/store checks are pending; no version,
 build number, signing, credentials, store state, OTA or production backend was changed.
 
 Local contract test command: `npx tsc shared/reimbursement-payment.ts --outDir /tmp/j027-mobile-tests --module commonjs --target es2020 --skipLibCheck`, then `PAYMENT_CONTRACT_PATH=/tmp/j027-mobile-tests/reimbursement-payment.js node --test tests/reimbursement-payment.test.cjs`. Backend/mobile copies must remain identical; compare with backend `lib/reimbursements/payment-schema.ts` before either changes.
+
+Latest integration evidence:169 backend mock tests, types, targeted lint/build and network-blocked actual dashboard/controller QA pass. Native review screen now gives existing secure web dashboard link for401/403; this is an interim path, not completed native payment entry. Privileged backend/header paths and private history/budget GETs now fail closed under existing verified web session identity. Do not deploy this cutover independently of approved client rollout. Exact decisions: see j027-remaining-decisions.md; header-only schema inventory confirms originalA:M and absent audit tab. REIMBURSEMENT_PAYMENT_ENABLED remains unset/defaultfalse. Token revocation/rotation is unconfirmed and must be resolved by the owner.

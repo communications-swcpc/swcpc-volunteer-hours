@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSession } from '@/context/SessionContext';
@@ -49,6 +50,7 @@ export default function ReviewReimbursementsScreen() {
   const [pending, setPending] = useState<Reimbursement[]>([]);
   const [approved, setApproved] = useState<Reimbursement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [signInRequired, setSignInRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -63,12 +65,15 @@ export default function ReviewReimbursementsScreen() {
     if (!session?.email) return;
     setError(null);
     try {
-      const headers = { 'x-mobile-email': session.email };
       const [pendingRes, approvedRes] = await Promise.all([
-        fetch(`${API_BASE}/api/reimbursements?status=PENDING`, { headers }),
-        fetch(`${API_BASE}/api/reimbursements?status=APPROVED`, { headers }),
+        fetch(`${API_BASE}/api/reimbursements?status=PENDING`),
+        fetch(`${API_BASE}/api/reimbursements?status=APPROVED`),
       ]);
 
+      if ([pendingRes.status, approvedRes.status].some(status => status === 401 || status === 403)) {
+        setPending([]); setApproved([]); setSignInRequired(true);
+        throw new Error('Verified staff sign-in is required. Your app email sign-in does not verify access to reimbursements.');
+      }
       if (!pendingRes.ok || !approvedRes.ok) {
         throw new Error('Failed to load reimbursements');
       }
@@ -112,7 +117,7 @@ export default function ReviewReimbursementsScreen() {
     try {
       const res = await fetch(`${API_BASE}/api/reimbursements/${id}/approve`, {
         method: 'POST',
-        headers: { 'x-mobile-email': session.email },
+        headers: { 'Content-Type': 'application/json' },
       });
       if (res.status === 409 || res.status === 404) {
         // Item already acted on elsewhere — silently refresh
@@ -153,7 +158,7 @@ export default function ReviewReimbursementsScreen() {
     try {
       const res = await fetch(`${API_BASE}/api/reimbursements/${id}/complete`, {
         method: 'POST',
-        headers: { 'x-mobile-email': session.email },
+        headers: { 'Content-Type': 'application/json' },
       });
       if (res.status === 409 || res.status === 404) {
         await fetchData();
@@ -200,9 +205,13 @@ export default function ReviewReimbursementsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
+        {signInRequired ? <TouchableOpacity style={styles.retryButton} onPress={() => {
+          Linking.openURL(`${API_BASE}/reimbursements`).catch(() => Alert.alert('Unable to open dashboard', 'Open the staff reimbursement dashboard in your browser.'));
+        }}>
+          <Text style={styles.retryButtonText}>Open secure staff dashboard</Text>
+        </TouchableOpacity> : <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
           <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
     );
   }
