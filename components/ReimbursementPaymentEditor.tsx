@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Text, TextInput, View } from 'react-native';
+import { Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
 import { normalizePaymentDetails, parsePaymentPatch, isFutureCheckDate, type PaymentDetails,
   type PaymentValidationLimits, type ReviewerReimbursement } from '../shared/reimbursement-payment';
 
@@ -74,17 +74,17 @@ function Draft({ request, completionAllowed, completionBlockedMessage, completio
   return <View style={{ gap: 12, padding: 16 }}>
     <Text>{request.full_name} · ${Number(request.amount).toFixed(2)} · {request.status}</Text>
     <Text>Check number · optional</Text>
-    <TextInput accessibilityLabel="Check number" value={draft.check_number} maxLength={limits.checkNumber}
+    <TextInput style={styles.input} accessibilityLabel="Check number" value={draft.check_number} maxLength={limits.checkNumber}
       editable={!busy} autoCapitalize="none" onChangeText={value => setDraft({ ...draft, check_number: value })} />
     <Text>{dateLabel} · optional</Text>
-    <TextInput accessibilityLabel={dateLabel} placeholder="YYYY-MM-DD" value={draft.check_date}
+    <TextInput style={styles.input} accessibilityLabel={dateLabel} placeholder="YYYY-MM-DD" value={draft.check_date}
       editable={!busy} maxLength={10} onChangeText={value => setDraft({ ...draft, check_date: value })} />
     {isFutureCheckDate(draft.check_date, today) ? <Text>Future date—confirm the intended check date.</Text> : null}
     <Text>Internal payment note · optional</Text>
-    <TextInput accessibilityLabel="Internal payment note" value={draft.payment_note} multiline maxLength={limits.note}
+    <TextInput style={[styles.input, styles.textarea]} accessibilityLabel="Internal payment note" textAlignVertical="top" value={draft.payment_note} multiline maxLength={limits.note}
       editable={!busy} onChangeText={value => setDraft({ ...draft, payment_note: value })} />
     <Text>Correction, clearing or reissue reason</Text>
-    <TextInput accessibilityLabel="Correction, clearing or reissue reason" value={reason} maxLength={limits.reason}
+    <TextInput style={styles.input} accessibilityLabel="Correction, clearing or reissue reason" value={reason} maxLength={limits.reason}
       editable={!busy} onChangeText={setReason} />
     {uncertain ? <Button title="Refresh and reconcile" disabled={busy} onPress={reconcile} /> : null}
     {stale ? <Text accessibilityRole="alert">This request changed. Reopen refreshed details before saving.</Text> : null}
@@ -109,3 +109,7 @@ function Draft({ request, completionAllowed, completionBlockedMessage, completio
     }} />
   </View>;
 }
+const styles = StyleSheet.create({
+  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 15, color: '#111827', backgroundColor: '#fff' },
+  textarea: { minHeight: 96, paddingTop: 12 },
+});
