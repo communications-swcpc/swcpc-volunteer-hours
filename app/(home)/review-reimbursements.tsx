@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Button, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Modal, ScrollView, Text, View } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove, type NavigationAction } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -158,9 +158,8 @@ function Review({ email, canApprove, canComplete }: { email: string; canApprove:
           <Text>{row.full_name} · ${Number(row.amount).toFixed(2)}</Text><Text>{row.description}</Text>
           {status !== 'PENDING' ? <Text>Pay to: {row.address ? `${row.address.street}, ${row.address.city}, ${row.address.state} ${row.address.zip}` : 'No mailing address on file'}</Text> : null}
           {status === 'PENDING' && canApprove ? <Button title="Approve" disabled={active} onPress={() => approve(row)} /> : null}
-          {status !== 'PENDING' && canComplete ? <TouchableOpacity accessibilityRole="button" onPress={() => { selectedRef.current = row; setSelected(row); }}>
-            <Text>{pending[row.request_id] ? 'Reconcile pending payment' : status === 'COMPLETE' ? 'Payment details / correction' : 'Payment details'}</Text>
-          </TouchableOpacity> : null}
+          {status !== 'PENDING' && canComplete ? <Button title={pending[row.request_id] ? 'Reconcile pending payment' : status === 'COMPLETE' ? 'Payment details / correction' : 'Payment details'}
+            disabled={active} onPress={() => { selectedRef.current = row; setSelected(row); }} /> : null}
           {status !== 'PENDING' ? <Button title="View payment history" disabled={active} onPress={() => openHistory(row)} /> : null}
         </View>)}
       </View>)}
