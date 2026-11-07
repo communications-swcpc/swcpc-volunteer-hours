@@ -1,6 +1,7 @@
 export const VOLUNTEER_AREAS = [
+  'General Corridor',
   'Harcourt/Canton',
-  'Holyoke area',
+  'Holyoke Area',
   'Follen/Braddock Corner',
   "Follen and Braddock Hills/Lawyer's Alley",
   'Newton 4 Corners',
@@ -15,11 +16,14 @@ export const VOLUNTEER_AREAS = [
 ];
 
 export const VOLUNTEER_ACTIVITIES = [
+  'Gardening',
   'Shopping',
+  'Spring/Fall Cleanup',
+  'Hardscape Repair and Maintenance',
   'Outreach',
   'Event Management',
   'Meetings',
   'Fundraising',
-  'Hardscape repair and maintenance',
-  'Organizational work',
+  'Organizational Work',
+  'Technology Work',
 ];
