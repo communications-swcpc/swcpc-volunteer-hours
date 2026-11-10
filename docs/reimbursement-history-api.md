@@ -1,84 +1,78 @@
-# Reimbursement history: app status and the ContactCRM work it needs
+# Reimbursement history: what is built and what you still have to do
 
 **Date:** 2026-11-10
 **Design:** `docs/superpowers/specs/2026-11-08-volunteer-reimbursement-history-design.md` (approved)
-**App branch:** `feature/reimbursement-history-impl`
-**ContactCRM:** not started. The build job that wrote the app side could not write to the
-ContactCRM repository (outside its permitted folders), so every backend item below is
-still to do.
+**App branch:** `feature/reimbursement-history` (VolunteerHoursApp)
+**Backend branch:** `feature/reimbursement-history-api` (ContactCRM, 21 commits)
 
-## What the app branch has
+Both halves are coded and their test suites pass. Neither has been run on a phone, against
+a real spreadsheet, or deployed. The steps below are what stands between "built" and "working".
 
-- **My Reimbursements** card on the home screen, for every signed-in volunteer.
-- List screen (`app/(home)/my-reimbursements.tsx`): own requests newest first, amount,
-  description, status pill, and the date for that status (submitted, approved, paid).
-  Pull to refresh; reloads on focus.
-- Detail screen (`app/(home)/reimbursement-detail.tsx`): three-step track (Submitted,
-  Approved with approver name, Check written with check number and date when present,
-  "Not yet" otherwise), receipt thumbnails that open full size, and **Edit** only while
-  `PENDING`.
-- Edit screen (`app/(home)/edit-reimbursement.tsx`): amount, description and receipts,
-  prefilled. No delete.
-- Submit form accumulates up to five receipts (`components/ReceiptPicker.tsx`), each with
-  its own Remove.
-- Pure rules in `shared/reimbursement-history.ts`; network client in
-  `services/reimbursement-history.ts`.
+## What is built
 
-### What works against today's backend, unchanged
+### Phone app
 
-- The list and detail screens: today's contact route returns the base fields, which the
-  app decodes with blank check details, the approver's address instead of a name, and a
-  single receipt.
-- Submitting with **one** receipt: sent inline exactly as before.
+My Reimbursements card on the home screen; list, detail and edit screens; a submit form
+holding up to five receipts. It was written against the backend contract, so **the phone
+app needs no further change**. Do not ship a store build until the backend is deployed and
+steps 1 to 4 below are done.
 
-### What needs the backend below before it works
+### ContactCRM backend
 
-- Submitting with **two or more** receipts (needs the upload route).
-- **Edit** (needs the edit route). Without it, Save shows an error and changes nothing.
-- Check number and date, approver names, and multi-receipt thumbnails on the detail screen.
+- **Owner projection** on `GET /api/reimbursements/contact/[contactId]`: adds
+  `approved_by_name`, `check_number`, `check_date` and `receipt_urls`; never payment notes
+  or revision bookkeeping.
+- **`POST /api/reimbursements/receipts`**: uploads one receipt to Vercel Blob, returns `{ url }`.
+- **Create accepts `receipt_urls`** (1 to 5 Blob URLs).
+- **`PATCH /api/reimbursements/<id>`**: edits amount, description and receipts while the
+  request is `PENDING`; anything else is refused with 409 `NOT_PENDING`.
+- **`receipt_urls` column helpers**: read and write the list in column T, with a
+  single-receipt fallback when the header is missing.
+- **Weekly digest cron** `/api/cron/reimbursement-digest`: Sunday 11:00 Eastern, pending list
+  to vicepresident@, approved list to treasurer@, both copied to communications@; an empty
+  list sends nothing.
 
-Do not ship a store build with this branch until the ContactCRM work is deployed.
+## What you must do, in order
 
-## ContactCRM work required (contract the app is built against)
+1. **Add the header cell `receipt_urls` at `T1`** of the `db_Reimbursements` tab (right after
+   `payment_revision` at `S1`). Nothing in the code creates it. Until it exists the code
+   runs in single-receipt fallback: reads return one receipt, and a submission or edit
+   carrying more than one is **refused with a clear message**, not silently truncated.
+2. **Set `CRON_SECRET` in Vercel.** It is not set in any environment on the project today.
+   Without it the digest route returns 401 and logs a distinct "not configured" error. This
+   also means the existing daily `/api/cron/dcr-status-update` has been returning 401 and
+   doing nothing. That is a pre-existing problem this work uncovered, not one it caused.
+3. **Exercise it from a phone against a preview deployment.** Submit with two receipts, edit
+   a pending request, confirm an approved request refuses editing, and read a completed
+   request's check number. A green test suite is not evidence the feature works; nothing
+   here has been run end to end.
+4. **Check whether the preview deployment writes to the production spreadsheet.**
+   `GOOGLE_SHEET_ID` has separate preview and production entries, but their values are
+   encrypted in the API, so it is unknown whether they differ. If preview shares the
+   production sheet, a live test writes real rows and emails real reviewers. Use an
+   obviously labelled row, following the existing "QA TEST – J027 – do not pay" convention.
+5. **Trigger the digest by hand** with the cron secret once it is set. Confirm both emails
+   arrive, communications@ is copied, and an empty list produces no email at all.
 
-1. **Owner projection on `GET /api/reimbursements/contact/[contactId]`.** Add, additively,
-   to each row: `approved_by_name` (resolve `approved_by` against Contacts by email; empty
-   when no match, the app then shows the address), `check_number`, `check_date`, and
-   `receipt_urls` (array of strings; from the new column, falling back to
-   `[receipt_url]`). Never `payment_note` or payment revision bookkeeping. Update
-   `__tests__/lib/reimbursements/private-history-route.test.ts`, which pins this shape.
-2. **`POST /api/reimbursements/receipts`**: body `{ contact_id, email, receipt_base64,
-   receipt_mime }`. Verify the contact and email pair as the create route does, `put` the
-   file to Vercel Blob under `receipts/<year>/` exactly as create does, return
-   `{ url }`. One receipt per request (Vercel's ~4.5 MB body cap).
-3. **Create accepts `receipt_urls`** (1 to 5, each an `https://*.public.blob.vercel-storage.com`
-   URL). The app also sends `receipt_url` = the first URL, so today's create route already
-   stores the first receipt. Write the full list to column T when its header is present.
-4. **`PATCH /api/reimbursements/[id]`**: header `x-mobile-email`, body
-   `{ contact_id, amount, description, receipt_urls }`. Rules from the design:
-   - Row's `contact_id` and lowercased `email` must both match, else **404**.
-   - Re-read status server-side; not `PENDING` → **409** with
-     `{ error, code: 'NOT_PENDING' }` (the app shows `error` and returns to the detail).
-   - Budget check measured against the row's own `year`, **excluding the request being
-     edited** (today's `getBudgetForContact` counts it, which would reject valid edits).
-   - Write only `D:F` (amount, description, first receipt) and `T` (JSON list, only when
-     the header is present), with RAW values, never the status, approval or payment
-     cells. Same double-read and readback pattern as `approveSheetReimbursement`.
-   - No re-notify, no change to `submitted_at` or `year`, no "edited at" column.
-   - Pin with tests: refusal on a non-pending row, and the budget exclusion.
-5. **Column T header `receipt_urls`** on the live `db_Reimbursements` tab, added once by
-   hand. Code must treat it as absent-and-empty when missing.
-6. **Weekly digest cron** `/api/cron/reimbursement-digest`, `CRON_SECRET` bearer like
-   `dcr-status-update`. `vercel.json` entries `0 15 * * 0` and `0 16 * * 0`; the route
-   acts only when it is Sunday 11:00 in `America/New_York` and returns without sending on
-   the other pass. `PENDING` list to vicepresident@, `APPROVED` list to treasurer@, both
-   CC communications@ (`sendEmail` has no CC field today; add one). Rows: volunteer name,
-   amount, description, days waiting (from `submitted_at` for pending, `approved_at` for
-   approved). Empty list → that email is not sent. Each email independent; one failure is
-   logged and does not block the other. Link to the review dashboard as the existing
-   notification emails do.
+## Known limits (decisions, not oversights)
+
+- **Trust model.** Volunteer reads and writes trust the claimed email and contact ID; the
+  project owner accepted that tradeoff deliberately. The history route is unauthenticated
+  and now also carries check numbers and an approver's name.
+- **Stale approval.** An approver can approve an amount a volunteer changed after the
+  approver last looked. Two possible fixes are open decisions for you: re-notify reviewers
+  on edit, or make approval carry the revision the reviewer saw (this one needs a phone app
+  release).
+- **Digest timing.** On Vercel's Hobby plan a cron fires anywhere inside its scheduled hour,
+  so the digest arrives between 11:00 and 11:59 Eastern. A firing delayed across the hour
+  boundary skips that week; in winter that is logged, in summer it cannot be told apart
+  from the ordinary off-pass and is silent.
+- **No delete, by design.** Deleting a row shifts the rows beneath it, and the approval path
+  writes to absolute row positions.
 
 ## Tests
+
+Phone app (from the VolunteerHoursApp root):
 
 ```
 npx tsc shared/reimbursement-history.ts services/reimbursement-history.ts \
@@ -91,5 +85,7 @@ PAYMENT_CLIENT_PATH=/tmp/rh-tests/services/reimbursement-payments.js \
 node --test tests/*.cjs
 ```
 
-38 tests, all passing on 2026-11-10; `npx tsc --noEmit` clean. Not yet run on a device or
-simulator.
+38 tests, all passing on 2026-11-10.
+
+ContactCRM (from the worktree or checkout): `npx vitest run`. 25 files, 319 tests, all
+passing on 2026-11-10.
