@@ -1,67 +1,53 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Alert, ActivityIndicator, Image, Platform,
+  StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { FormField } from '@/components/FormField';
 import { AddressModal, AddressInput } from '@/components/AddressModal';
 import { API_BASE } from '@/constants/api';
-import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/context/SessionContext';
+import { ReceiptPicker, type ReceiptItem } from '@/components/ReceiptPicker';
+import { createHistoryClient, HistoryClientError } from '@/services/reimbursement-history';
+
+const historyClient = createHistoryClient({ baseURL: API_BASE, transport: fetch });
 
 export default function ReimbursementScreen() {
   const { session } = useSession();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const [receipt, setReceipt] = useState<{ uri: string; base64?: string; mime: string } | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; description?: string; receipt?: string }>({});
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [addressSaving, setAddressSaving] = useState(false);
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera access is required to take a photo of your receipt.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, quality: 0.8, base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setReceipt({ uri: asset.uri, base64: asset.base64 || undefined, mime: asset.mimeType || 'image/jpeg' });
-    }
-  };
-
-  const pickFile = async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'], copyToCacheDirectory: true });
-    if (result.canceled) return;
-    const file = result.assets[0];
-    const mime = file.mimeType || 'image/jpeg';
-    if (file.uri && (mime.startsWith('image/') || mime === 'application/pdf')) {
-      try {
-        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-        setReceipt({ uri: file.uri, base64, mime });
-      } catch {
-        setReceipt({ uri: file.uri, mime });
-      }
-    }
-  };
 
   const validateForm = (): boolean => {
     const newErrors: typeof errors = {};
     if (!amount.trim()) newErrors.amount = 'Amount is required';
     else if (isNaN(Number(amount)) || Number(amount) <= 0) newErrors.amount = 'Enter a positive number';
     if (!description.trim()) newErrors.description = 'Description is required';
-    if (!receipt) newErrors.receipt = 'Receipt is required';
+    if (!receipts.length) newErrors.receipt = 'Receipt is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // A single receipt still travels inline, exactly as before. Several are
+  // uploaded one request each (Vercel's ~4.5 MB body cap), then sent as URLs;
+  // receipt_url carries the first so every existing reader keeps working.
+  // Uploaded URLs are kept on the item so a retry never uploads twice.
+  const receiptFields = async (): Promise<Record<string, unknown>> => {
+    if (receipts.length === 1 && !receipts[0].url) {
+      return { receipt_base64: receipts[0].base64, receipt_mime: receipts[0].mime };
+    }
+    const uploaded: ReceiptItem[] = [];
+    for (const r of receipts) {
+      uploaded.push(r.url ? r : { ...r, url: await historyClient.uploadReceipt(session!, { base64: r.base64!, mime: r.mime }) });
+    }
+    setReceipts(uploaded);
+    const urls = uploaded.map(r => r.url!);
+    return { receipt_url: urls[0], receipt_urls: urls };
   };
 
   const postReimbursement = async (address?: AddressInput) => {
@@ -70,8 +56,7 @@ export default function ReimbursementScreen() {
       email: session!.email,
       amount: Number(amount),
       description: description.trim(),
-      receipt_base64: receipt!.base64,
-      receipt_mime: receipt!.mime,
+      ...(await receiptFields()),
     };
     if (address) body.address = address;
     const res = await fetch(`${API_BASE}/api/reimbursements`, {
@@ -85,15 +70,15 @@ export default function ReimbursementScreen() {
     Alert.alert('Submitted!', 'Your reimbursement request has been sent. The vice president and treasurer have been notified.');
     setAmount('');
     setDescription('');
-    setReceipt(null);
+    setReceipts([]);
     setAddressModalVisible(false);
     setSubmitting(false);
   };
 
   const handleSubmit = async () => {
     if (!session || !validateForm()) return;
-    if (!receipt?.base64) {
-      Alert.alert('Error', 'Receipt is required. Please take a photo or choose a file.');
+    if (receipts.some(r => !r.url && !r.base64)) {
+      Alert.alert('Error', 'A receipt could not be read. Remove it and attach it again.');
       return;
     }
     setSubmitting(true);
@@ -107,8 +92,8 @@ export default function ReimbursementScreen() {
         Alert.alert('Error', data.error || 'Failed to submit. Please try again.');
         setSubmitting(false);
       }
-    } catch {
-      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof HistoryClientError ? error.message : 'Network error. Please check your connection and try again.');
       setSubmitting(false);
     }
   };
@@ -122,8 +107,8 @@ export default function ReimbursementScreen() {
       } else {
         Alert.alert('Error', data.error || 'Failed to save address and submit. Please try again.');
       }
-    } catch {
-      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof HistoryClientError ? error.message : 'Network error. Please check your connection and try again.');
     } finally {
       setAddressSaving(false);
     }
@@ -155,30 +140,8 @@ export default function ReimbursementScreen() {
             />
           </FormField>
 
-          <FormField label="Receipt" required error={errors.receipt}>
-            <View style={styles.receiptRow}>
-              <TouchableOpacity style={styles.receiptBtn} onPress={takePhoto}>
-                <Ionicons name="camera-outline" size={24} color="#2d6a4f" />
-                <Text style={styles.receiptBtnText}>Take Photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.receiptBtn} onPress={pickFile}>
-                <Ionicons name="document-outline" size={24} color="#2d6a4f" />
-                <Text style={styles.receiptBtnText}>Choose File</Text>
-              </TouchableOpacity>
-            </View>
-            {receipt && (
-              <View style={styles.receiptPreview}>
-                {receipt.mime.startsWith('image/') ? (
-                  <Image source={{ uri: receipt.uri }} style={styles.receiptThumb} resizeMode="cover" />
-                ) : (
-                  <Ionicons name="document" size={48} color="#6b7280" />
-                )}
-                <Text style={styles.receiptPreviewText}>Receipt attached</Text>
-                <TouchableOpacity onPress={() => setReceipt(null)}>
-                  <Text style={styles.removeText}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+          <FormField label="Receipts" required error={errors.receipt}>
+            <ReceiptPicker receipts={receipts} onChange={setReceipts} />
           </FormField>
 
           <TouchableOpacity
@@ -213,11 +176,4 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#2d6a4f', borderRadius: 10, padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  receiptRow: { flexDirection: 'row', gap: 12 },
-  receiptBtn: { flex: 1, borderWidth: 1, borderColor: '#2d6a4f', borderRadius: 8, padding: 16, alignItems: 'center', gap: 8 },
-  receiptBtnText: { fontSize: 14, color: '#2d6a4f', fontWeight: '600' },
-  receiptPreview: { marginTop: 12, padding: 12, backgroundColor: '#f9fafb', borderRadius: 8, alignItems: 'center', gap: 8 },
-  receiptThumb: { width: 120, height: 120, borderRadius: 8 },
-  receiptPreviewText: { fontSize: 13, color: '#6b7280' },
-  removeText: { fontSize: 13, color: '#dc2626', fontWeight: '600' },
 });

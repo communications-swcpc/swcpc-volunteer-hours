@@ -49,6 +49,21 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push('/(home)/my-reimbursements')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.actionCardContent}>
+            <Ionicons name="list-outline" size={32} color="#2d6a4f" />
+            <View style={styles.actionCardText}>
+              <Text style={styles.actionCardTitle}>My Reimbursements</Text>
+              <Text style={styles.actionCardSubtitle}>See whether your requests are approved and paid</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </View>
+        </TouchableOpacity>
+
         {isPrivileged && (
           <TouchableOpacity
             style={styles.actionCard}
