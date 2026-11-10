@@ -1,0 +1,1 @@
+the app trusts an x-mobile-email header for reimbursement approvals

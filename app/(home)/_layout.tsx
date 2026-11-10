@@ -58,6 +58,9 @@ export default function HomeLayout() {
           title: 'Reimbursement',
         }}
       />
+      <Stack.Screen name="my-reimbursements" options={{ title: 'My Reimbursements' }} />
+      <Stack.Screen name="reimbursement-detail" options={{ title: 'Request' }} />
+      <Stack.Screen name="edit-reimbursement" options={{ title: 'Edit Request' }} />
       <Stack.Screen
         name="review-reimbursements"
         options={{
